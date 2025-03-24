@@ -18,6 +18,8 @@ from flwr.common import (
 from flwr.server.client_proxy import ClientProxy
 
 
+
+
 class DPFedASGPStrategy(fl.server.strategy.FedAvg):
     """Server strategy implementing DP-FedASGP"""
     def __init__(self, *args, **kwargs):
@@ -27,50 +29,21 @@ class DPFedASGPStrategy(fl.server.strategy.FedAvg):
         self.current_round = 0
         self.privacy_cost = 0
 
-    def aggregate_fit(
-        self,
-        server_round: int,
-        results: List[Tuple[ClientProxy, FitRes]],
-        failures: List[BaseException],
-    ) -> Tuple[Optional[Parameters], Dict]:
-        """Aggregate results with privacy protection"""
+    def aggregate_fit(self, server_round: int, results: List[Tuple[ClientProxy, FitRes]], failures: List[BaseException]):
         if not results:
             return None, {}
-
-        self.current_round = server_round
-
-        # Compute weights and aggregate
-        weights = {}
-        total_samples = sum(fit_res.num_examples for _, fit_res in results)
-        self.aggregator.update_total_samples(total_samples)
-
-        accuracy = 0
-        loss = 0
-        protected_grads = 0
-        total_grads = 0
-
+        self.aggregator.reset()
+        parameters_list = []
+        weights = []
         for client, fit_res in results:
-            weights[client.cid] = self.aggregator.compute_weight(
-                client.cid,
-                fit_res.num_examples,
-                fit_res.metrics["loss"]
-            )
-
-            accuracy += fit_res.metrics["accuracy"] * weights[client.cid]
-            loss += fit_res.metrics["loss"] * weights[client.cid]
-            protected_grads += fit_res.metrics["protected_grads"]
-            total_grads += fit_res.metrics["total_grads"]
-
-        # Update privacy cost
-        self.privacy_cost += sum(EPSILON)
-
-        # Update metrics
-        self.metrics.update({
-            "accuracy": accuracy,
-            "loss": loss,
-            "privacy_cost": self.privacy_cost,
-            "protected_ratio": (protected_grads / total_grads * 100) if total_grads > 0 else 0
-        })
-        # Aggregate parameters
-        parameters_aggregated = super().aggregate_fit(server_round, results, failures)
-        return parameters_aggregated
+            params = parameters_to_ndarrays(fit_res.parameters)
+            metrics = fit_res.metrics
+            num_samples = fit_res.num_examples
+            weight = self.aggregator.compute_weight(client.cid, num_samples, metrics["loss"])
+            parameters_list.append(params)
+            weights.append(weight)
+        aggregated_params = [
+            np.sum([w * p[i] for w, p in zip(weights, parameters_list)], axis=0)
+            for i in range(len(parameters_list[0]))
+        ]
+        return ndarrays_to_parameters(aggregated_params), {}    

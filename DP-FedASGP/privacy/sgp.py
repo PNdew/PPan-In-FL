@@ -1,67 +1,70 @@
 import torch
 import numpy as np
 from config import *
+from torch.distributions.laplace import Laplace
 
 class SignificantGradientProtection:
-    """Enhanced SGP with improved threshold computation"""
+    """Enhanced SGP with dynamic privacy budget"""
     def __init__(self, model_params: int, total_rounds: int):
         self.total_params = model_params
         self.total_rounds = total_rounds
-        self.epsilon = EPSILON
+        self.epsilon = INITIAL_EPSILON
         self.sensitivity = SENSITIVITY
         self.protected_count = 0
         self.total_count = 0
+        self.accuracy_history = []
+        logger.info(f"Initialized SGP with {model_params} parameters")
 
     def compute_threshold(self, round: int, gradients: torch.Tensor) -> float:
-        """Compute threshold with bounds checking"""
         sorted_grads = torch.sort(gradients.abs().flatten())[0]
-        total_elements = len(sorted_grads)
-
-        # Compute indices with bounds checking
-        idx1 = min(
-            int((round * total_elements) / self.total_rounds),
-            total_elements - 1
-        )
-        idx2 = min(
-            int(0.9 * total_elements),
-            total_elements - 1
-        )
-
-        return min(sorted_grads[idx1].item(), sorted_grads[idx2].item())
+        total_params = gradients.numel()
+        m1 = int((round * total_params) / self.total_rounds)
+        m90 = int(0.9 * total_params)
+        threshold1 = sorted_grads[m1] if m1 < total_params else sorted_grads[-1]
+        threshold2 = sorted_grads[m90] if m90 < total_params else sorted_grads[-1]
+        return min(threshold1, threshold2).item()
 
     def protect_gradients(self, gradients: torch.Tensor, round: int) -> torch.Tensor:
-        """Apply gradient protection"""
+        """Apply gradient protection with dynamic privacy"""
         try:
-            # Reset counters
-            self.protected_count = 0
-            self.total_count = gradients.numel()
-
-            # Ensure gradients are on correct device
-            gradients = gradients.to(DEVICE)
-
-            # Clip gradients
-            clipped_grads = torch.clamp(gradients, -CLIP_BOUND, CLIP_BOUND)
-
             # Compute threshold
-            threshold = self.compute_threshold(round, clipped_grads)
-
-            # Add noise for importance evaluation
-            alpha = np.random.laplace(0, self.sensitivity/self.epsilon[0])
-            beta = np.random.laplace(0, self.sensitivity/self.epsilon[1])
+            threshold = self.compute_threshold(round, gradients)
 
             # Identify significant gradients
-            importance_mask = (clipped_grads.abs() + alpha >= threshold + beta)
-            self.protected_count = importance_mask.sum().item()
+            significant_mask = gradients.abs() > threshold
 
-            # Add Laplace noise to significant gradients
-            noise = torch.tensor(
-                np.random.laplace(0, self.sensitivity/self.epsilon[2], gradients.shape),
-                dtype=gradients.dtype,
-                device=DEVICE
+            # Track protection statistics
+            self.total_count += gradients.numel()
+            self.protected_count += significant_mask.sum().item()
+
+            # Add noise only to significant gradients
+            protected_grads = gradients.clone()
+            if significant_mask.any():
+                noise = Laplace(0, self.sensitivity / self.epsilon).sample(gradients[significant_mask].shape)
+                protected_grads[significant_mask] += noise
+
+            # Clip final values
+            protected_grads = torch.clamp(
+                protected_grads,
+                -CLIP_BOUND,
+                CLIP_BOUND
             )
 
-            return torch.where(importance_mask, clipped_grads + noise, clipped_grads)
+            return protected_grads
 
         except Exception as e:
             logger.error(f"Error protecting gradients: {e}")
-            return clipped_grads
+            return gradients
+
+    def adjust_privacy_budget(self, accuracy: float):
+        """Dynamically adjust privacy budget based on accuracy trends"""
+        self.accuracy_history.append(accuracy)
+        if len(self.accuracy_history) >= 2:
+            improvement = self.accuracy_history[-1] - self.accuracy_history[-2]
+
+            if improvement > 0.05:  # Good improvement
+                self.epsilon = max(self.epsilon * 0.9, MIN_EPSILON)
+                logger.info(f"Reducing ε to {self.epsilon:.4f}")
+            elif improvement < 0.01:  # Stagnating
+                self.epsilon = min(self.epsilon * 1.1, MAX_EPSILON)
+                logger.info(f"Increasing ε to {self.epsilon:.4f}")
