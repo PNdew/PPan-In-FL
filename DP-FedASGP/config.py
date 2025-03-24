@@ -28,6 +28,7 @@ CLIP_BOUND = 1.0      # Gradient clipping bound
 SENSITIVITY = 2.0     # Privacy sensitivity
 ALPHA = 0.05         # α parameter for CLDP
 DIRICHLET_ALPHA = 0.5  # Dirichlet distribution parameter
+BETA = 0.01
 
 # Device configuration
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

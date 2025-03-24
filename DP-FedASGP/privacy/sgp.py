@@ -5,15 +5,18 @@ from torch.distributions.laplace import Laplace
 
 class SignificantGradientProtection:
     """Enhanced SGP with dynamic privacy budget"""
-    def __init__(self, model_params: int, total_rounds: int):
+    def __init__(self, model_params: int, total_rounds: int, epsilon1: float, epsilon2: float, epsilon3: float):
         self.total_params = model_params
         self.total_rounds = total_rounds
-        self.epsilon = INITIAL_EPSILON
+        self.epsilon1 = epsilon1
+        self.epsilon2 = epsilon2
+        self.epsilon3 = epsilon3
         self.sensitivity = SENSITIVITY
         self.protected_count = 0
         self.total_count = 0
         self.accuracy_history = []
         logger.info(f"Initialized SGP with {model_params} parameters")
+
 
     def compute_threshold(self, round: int, gradients: torch.Tensor) -> float:
         sorted_grads = torch.sort(gradients.abs().flatten())[0]
@@ -40,7 +43,7 @@ class SignificantGradientProtection:
             # Add noise only to significant gradients
             protected_grads = gradients.clone()
             if significant_mask.any():
-                noise = Laplace(0, self.sensitivity / self.epsilon).sample(gradients[significant_mask].shape)
+                noise = noise = Laplace(0, self.sensitivity / self.epsilon).sample(gradients[significant_mask].shape)
                 protected_grads[significant_mask] += noise
 
             # Clip final values

@@ -16,7 +16,7 @@ from flwr.common import (
     ndarrays_to_parameters, parameters_to_ndarrays
 )
 from flwr.server.client_proxy import ClientProxy
-
+from config import *
 
 
 
@@ -46,4 +46,14 @@ class DPFedASGPStrategy(fl.server.strategy.FedAvg):
             np.sum([w * p[i] for w, p in zip(weights, parameters_list)], axis=0)
             for i in range(len(parameters_list[0]))
         ]
-        return ndarrays_to_parameters(aggregated_params), {}    
+        return ndarrays_to_parameters(aggregated_params), {}
+
+    def __del__(self):
+        """Cleanup resources"""
+        try:
+            # Clear metrics history
+            self.metrics.history.clear()
+            # Close any open files
+            logging.shutdown()
+        except Exception as e:
+            logger.error(f"Error in cleanup: {e}")   

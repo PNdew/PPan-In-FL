@@ -12,14 +12,15 @@ from flwr.common import (
     FitRes, Parameters, Config, Context, Scalar,
     ndarrays_to_parameters, parameters_to_ndarrays
 )
-
+from privacy.PrivacyMetrics import PrivacyMetrics
+from config import *
 class DPFedASGPClient(fl.client.NumPyClient):
     """Client implementing DP-FedASGP"""
     def __init__(self, cid: str, model: Net, trainloader: DataLoader):
         self.cid = cid
         self.model = model.to(DEVICE)
         self.trainloader = trainloader
-
+        privacy_metrics = PrivacyMetrics()
         # Initialize SGP
         total_params = sum(p.numel() for p in model.parameters())
         self.sgp = SignificantGradientProtection(total_params, NUM_ROUNDS)
@@ -65,19 +66,16 @@ class DPFedASGPClient(fl.client.NumPyClient):
                   output = self.model(data)
                   loss = self.criterion(output, target)
                   loss.backward()
-
-                  # Apply SGP to gradients
+                  original_grads = torch.cat([p.grad.view(-1) for p in self.model.parameters() if p.grad is not None])
+                  torch.nn.utils.clip_grad_norm_(self.model.parameters(), CLIP_BOUND)
                   for param in self.model.parameters():
                       if param.grad is not None:
-                          param.grad.data = self.sgp.protect_gradients(
-                              param.grad.data,
-                              self.current_round
-                          )
+                          param.grad.data = self.sgp.protect_gradients(param.grad.data, self.current_round, alpha=ALPHA, beta=BETA)
                           protected_grads += self.sgp.protected_count
                           total_grads += self.sgp.total_count
+                  self.privacy_metrics.update(original_grads, protected_grads, self.current_round)
 
                   # Clip gradients
-                  torch.nn.utils.clip_grad_norm_(self.model.parameters(), CLIP_BOUND)
                   self.optimizer.step()
 
                   total_loss += loss.item() * len(data)
@@ -99,3 +97,35 @@ class DPFedASGPClient(fl.client.NumPyClient):
       except Exception as e:
           logger.error(f"Error in fit for client {self.cid}: {e}")
           return parameters, 0, {}
+
+    def evaluate_test(self) -> Dict[str, float]:
+        """Evaluate model on test set"""
+        self.model.eval()
+        test_loss = 0
+        correct = 0
+        total = 0
+
+        try:
+            with torch.no_grad():
+                for data, target in self.testloader:
+                    data, target = data.to(DEVICE), target.to(DEVICE)
+                    output = self.model(data)
+                    test_loss += self.criterion(output, target).item()
+                    pred = output.argmax(dim=1, keepdim=True)
+                    total += target.size(0)
+                    correct += pred.eq(target.view_as(pred)).sum().item()
+
+            accuracy = correct / total if total > 0 else 0
+            avg_loss = test_loss / len(self.testloader)
+
+            # Adjust privacy budget based on test accuracy
+            self.sgp.adjust_privacy_budget(accuracy)
+
+            return {
+                "test_loss": avg_loss,
+                "test_accuracy": accuracy
+            }
+
+        except Exception as e:
+            logger.error(f"Error in test evaluation: {e}")
+            return {"test_loss": float('inf'), "test_accuracy": 0.0}
