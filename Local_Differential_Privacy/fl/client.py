@@ -67,14 +67,17 @@ class AdaptiveLDP:
     def adjust_epsilon(self, accuracy: float, leakage: float):
         self.accuracy_history.append(accuracy)
         self.leakage_history.append(leakage)
+
         if len(self.accuracy_history) >= WINDOW_SIZE:
             avg_accuracy = np.mean(self.accuracy_history)
-            avg_leakage = np.mean(self.leakage_history)
-            accuracy_diff = TARGET_ACCURACY - avg_accuracy
-            leakage_penalty = 0.1 * avg_leakage
-            delta = ADJUST_RATE * (accuracy_diff - leakage_penalty)
-            new_epsilon = self.epsilon * (1.0 + delta)
+
+            # Điều chỉnh epsilon theo công thức bài báo
+            adjustment_factor = ADJUST_RATE * ((TARGET_ACCT - avg_accuracy) / TARGET_ACCT)
+            new_epsilon = self.epsilon + adjustment_factor
+
+            # Đảm bảo epsilon nằm trong khoảng [MIN_EPSILON, MAX_EPSILON]
             self.epsilon = np.clip(new_epsilon, MIN_EPSILON, MAX_EPSILON)
+
 
 class PrivacyClient(fl.client.NumPyClient):
     def __init__(self, cid: str, model: nn.Module, train_loader: DataLoader):
