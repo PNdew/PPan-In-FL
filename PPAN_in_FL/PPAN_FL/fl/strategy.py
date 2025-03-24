@@ -159,12 +159,6 @@ class FedAvg_Privacy(fl.server.strategy.FedAvg):
         # Convert parameters to ndarrays
         ndarrays = parameters_to_ndarrays(parameters_aggregated)
 
-        # Add noise to parameters for privacy
-        parameters_noised = [
-            p + np.random.normal(0, self.noise_scale, p.shape)
-            for p in ndarrays
-        ]
-
         # Aggregate metrics
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
@@ -183,4 +177,4 @@ class FedAvg_Privacy(fl.server.strategy.FedAvg):
         save_metric_to_txt(server_round, "distortion", avg_distortion, phase="train")
 
         # Convert back to Parameters and return
-        return ndarrays_to_parameters(parameters_noised), metrics_aggregated
+        return ndarrays_to_parameters(ndarrays), metrics_aggregated
