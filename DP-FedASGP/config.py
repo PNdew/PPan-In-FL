@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 # Constants for MNIST and FL training
 NUM_CLIENTS = 10
 LOCAL_EPOCHS = 5
-BATCH_SIZE = 32
-NUM_ROUNDS = 10
-LEARNING_RATE = 0.001
+BATCH_SIZE = 16
+NUM_ROUNDS = 200
+LEARNING_RATE = 0.1
 
 # Privacy parameters
 INITIAL_EPSILON = 1.0  # Initial privacy budget
