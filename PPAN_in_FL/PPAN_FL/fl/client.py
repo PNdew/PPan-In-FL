@@ -6,6 +6,11 @@ from models.privacy_mechanism import PrivacyMechanism
 from utils.metrics import compute_privacy_leakage, compute_distortion
 import torch.optim as optim
 import torch.nn.functional as F
+import torch
+import numpy as np
+from flwr.common import NDArrays, Scalar, Parameters
+from typing import Dict, Tuple
+
 
 # Define PrivacyClient for Federated Learning
 class PrivacyClient(fl.client.NumPyClient):
@@ -69,36 +74,4 @@ class PrivacyClient(fl.client.NumPyClient):
             "accuracy": float(accuracy),
             "privacy_leakage": privacy_leakage,
             "distortion": distortion
-        }
-
-    def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]) -> Tuple[float, int, Dict[str, Scalar]]:
-        self.set_parameters(parameters)
-        self.model.eval()
-
-        total_loss, correct = 0, 0
-        with torch.no_grad():
-            for images, labels in self.test_loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
-                outputs = self.model(images)
-                loss = F.cross_entropy(outputs, labels)
-                total_loss += loss.item()
-
-                predicted = outputs.argmax(dim=1)
-                correct += (predicted == labels).sum().item()
-
-            flat_params = torch.cat([p.view(-1) for p in self.model.parameters()]).unsqueeze(0).to(DEVICE)
-            encrypted_params = self.privacy_mech.encrypt(flat_params)
-            encrypted_np = np.array(encrypted_params.cpu().numpy().flatten(), dtype=np.float32)
-            original_np = flat_params.cpu().numpy().flatten()
-
-            privacy_leakage = compute_privacy_leakage(encrypted_np, original_np)
-            distortion = compute_distortion(original_np, encrypted_np)
-
-        avg_loss = total_loss / len(self.test_loader)
-        accuracy = correct / len(self.test_loader.dataset)
-
-        return avg_loss, len(self.test_loader.dataset), {
-            "accuracy": float(accuracy),
-            "privacy_leakage": float(privacy_leakage),
-            "distortion": float(distortion)
         }

@@ -4,7 +4,7 @@ import random
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.client_manager import ClientManager
 from flwr.server.criterion import Criterion
-
+from typing import Dict, List, Optional
 
 class SimpleClientManager(ClientManager):
     def __init__(self) -> None:
@@ -61,5 +61,4 @@ class SimpleClientManager(ClientManager):
             return [self.clients[cid] for cid in sampled_cids]
         
         sampled_cids = random.sample(available_cids, num_clients)
-        self.seed += 1
         return [self.clients[cid] for cid in sampled_cids]

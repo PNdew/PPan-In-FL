@@ -46,7 +46,7 @@ from typing import Dict, List, Optional
 import random
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.criterion import Criterion
-from config import NOISE_SCALE
+from config import *
 from utils.save_utils import save_metric_to_txt
 
 
@@ -158,6 +158,9 @@ class FedAvg_Privacy(fl.server.strategy.FedAvg):
 
         # Convert parameters to ndarrays
         ndarrays = parameters_to_ndarrays(parameters_aggregated)
+
+        # Add noise to parameters for privacy
+
 
         # Aggregate metrics
         metrics_aggregated = {}
