@@ -174,10 +174,10 @@ class FedAvg_Privacy(fl.server.strategy.FedAvg):
         avg_distortion = np.mean([r.metrics["distortion"] for _, r in results])
 
         # Lưu lại kết quả trên server
-        save_metric_to_txt(server_round, "loss", avg_loss, phase="train")
-        save_metric_to_txt(server_round, "accuracy", avg_accuracy, phase="train")
-        save_metric_to_txt(server_round, "privacy_leakage", avg_privacy_leakage, phase="train")
-        save_metric_to_txt(server_round, "distortion", avg_distortion, phase="train")
+        save_metric_to_txt("loss", avg_loss, phase="train")
+        save_metric_to_txt("accuracy", avg_accuracy, phase="train")
+        save_metric_to_txt("privacy_leakage", avg_privacy_leakage, phase="train")
+        save_metric_to_txt("distortion", avg_distortion, phase="train")
 
         # Convert back to Parameters and return
         return ndarrays_to_parameters(ndarrays), metrics_aggregated

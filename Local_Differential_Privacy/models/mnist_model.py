@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms, datasets
+import torch.nn.functional as F
 
 class Net(nn.Module):
     def __init__(self):

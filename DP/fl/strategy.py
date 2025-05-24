@@ -26,6 +26,24 @@ import random
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.criterion import Criterion
 import threading
+from utils.save_utils import write_to_file
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import mutual_info_regression
+from flwr.server.strategy.aggregate import aggregate
+
+def compute_privacy_leakage(encrypted_weights, original_weights):
+    encrypted_weights = np.array(encrypted_weights)
+    original_weights = np.array(original_weights)
+    encrypted_2d = encrypted_weights.reshape(-1, 1)
+    original_2d = original_weights.reshape(-1, 1)
+    min_length = min(len(encrypted_2d), len(original_2d))
+    encrypted_2d = encrypted_2d[:min_length]
+    original_2d = original_2d[:min_length]
+    try:
+        mi_score = mutual_info_regression(encrypted_2d, original_2d.ravel())[0]
+    except ValueError:
+        mi_score = 0.0
+    return mi_score
 
 class DPFedAvgPrivacy(DPFedAvgFixed):
     def aggregate_fit(
@@ -42,7 +60,7 @@ class DPFedAvgPrivacy(DPFedAvgFixed):
 
         if len(param_arrays_flat) > 1:
             privacy_leakage = np.mean([
-                mutual_info_regression(param_arrays_flat[i].reshape(-1, 1), param_arrays_flat[i + 1])
+                compute_privacy_leakage(param_arrays_flat[i].reshape(-1, 1), param_arrays_flat[i + 1])
                 for i in range(len(param_arrays_flat) - 1)
             ])
         else:
@@ -52,14 +70,14 @@ class DPFedAvgPrivacy(DPFedAvgFixed):
         
         # Ghi kết quả vào các file riêng biệt
         with open("privacy_leakage.txt", "a") as f:
-            f.write(f"Round {server_round}: {privacy_leakage:.6f}\n")
+            f.write(f" {privacy_leakage:.6f}\n")
         
         accuracies = [fit_res.metrics["accuracy"] for _, fit_res in results if fit_res.metrics and "accuracy" in fit_res.metrics]
         avg_accuracy = np.mean(accuracies) if accuracies else 0.0
         metrics["accuracy"] = avg_accuracy
 
         with open("accuracy.txt", "a") as f:
-            f.write(f"Round {server_round}: {avg_accuracy:.6f}\n")
+            f.write(f" {avg_accuracy:.6f}\n")
         
         if failures:
             return None, {}

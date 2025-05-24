@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from .ppan import PPAN_Encoder, PPAN_Adversary
-from config.config import NOISE_SCALE
+from config import NOISE_SCALE
 
 class PrivacyMechanism(nn.Module):
     def __init__(self, input_dim, noise_scale=NOISE_SCALE):

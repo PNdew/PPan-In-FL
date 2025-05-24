@@ -1,5 +1,5 @@
 from config import *
-from models.mnist_model import MNISTModel
+from models.mnist_model import MNISTModel, MNISTResNet
 from fl.client import PrivacyClient
 from fl.strategy import *
 from fl.manager import SimpleClientManager
@@ -21,7 +21,7 @@ def client_fn(context: Context) -> fl.client.Client:
     client_data = federated_data[f"client_{partition_id}"]
     train_loader = get_dataloader(client_data)
     test_loader = get_dataloader(client_data)
-    model = MNISTModel()
+    model =  MNISTResNet()
 
     # Trả về client
     return PrivacyClient(model, train_loader, test_loader).to_client()

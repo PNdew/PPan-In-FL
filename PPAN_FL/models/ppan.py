@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-
+import torch
 class PPAN_Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim=32):
         super().__init__()
