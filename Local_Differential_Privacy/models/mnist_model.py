@@ -4,6 +4,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms, datasets
 import torch.nn.functional as F
+import torchvision.models as models
+
 
 class Net(nn.Module):
     def __init__(self):
@@ -21,3 +23,19 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)  # Không dùng softmax vì CrossEntropyLoss đã có sẵn softmax
         return x
+    
+class ResNet18(nn.Module):
+    def __init__(self):
+        super(ResNet18, self).__init__()
+        # Load pretrained ResNet18
+        self.model = models.resnet18(pretrained=True)
+        
+        # Modify first conv layer to accept 1 channel input (MNIST is grayscale)
+        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # Modify final fully connected layer for 10 classes (MNIST)
+        num_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_features, 10)
+
+    def forward(self, x):
+        return self.model(x)

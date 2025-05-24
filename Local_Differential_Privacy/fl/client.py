@@ -35,6 +35,7 @@ from flwr.server.strategy import DPFedAvgFixed
 from sklearn.feature_selection import mutual_info_regression
 from typing import Dict, List, Optional, Tuple, Union
 from config import *
+from models.mnist_model import Net, ResNet18
 
 class AdaptiveLDP:
     def __init__(self, epsilon_init=1.0, alpha=0.5, beta=0.2, target_accuracy=0.85, window_size=5, noise_clip=1.0):

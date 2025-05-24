@@ -4,7 +4,7 @@ from fl.client import PrivacyClient
 from fl.strategy import FedAvg_Privacy
 import flwr as fl
 from fl.manager import SimpleClientManager
-from models.mnist_model import Net
+from models.mnist_model import Net, ResNet18
 from flwr.common import Context
 from  utils.data_hanlding import get_dataloader
 
@@ -27,7 +27,7 @@ def main():
         train_loader = get_dataloader(client_data, train=True)
         test_loader = get_dataloader(client_data, train=False)
         
-        model = Net()
+        model = ResNet18()
         
         # Return client
         return PrivacyClient(str(partition_id), model, train_loader, test_loader)

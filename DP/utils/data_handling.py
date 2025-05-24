@@ -24,6 +24,7 @@ from sklearn.feature_selection import mutual_info_regression
 from typing import List, Dict, Tuple
 from flwr.common import NDArrays, EvaluateRes, Parameters, FitRes, Metrics, Context 
 from typing import Callable, Dict, List, Optional, Tuple, Union
+from models.mnist_model import *
 
 def split_mnist_dirichlet_flwr(num_clients=NUM_CLIENTS, alpha=0.5, seed=42):
     partitioner = DirichletPartitioner(
@@ -76,7 +77,7 @@ def get_client_fn(dataset: FederatedDataset,federated_data: Dict[str, List[Dict[
         client_data = federated_data[f"client_{partition_id}"]
         train_loader = get_dataloader(client_data)
         test_loader = get_dataloader(client_data)
-        model = MNISTModel()
+        model = ResNet18()
 
         # Trả về client
         return FlowerClient (model, train_loader, test_loader).to_client()

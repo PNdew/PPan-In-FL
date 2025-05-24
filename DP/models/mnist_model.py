@@ -1,5 +1,8 @@
 import torch.nn as nn
 from config import *
+import torch.models as models
+import torch.optim as optim
+import torch.nn.functional as F
 class MNISTModel(nn.Module):
     def __init__(self):
         super(MNISTModel, self).__init__()
@@ -21,5 +24,21 @@ class MNISTModel(nn.Module):
         x = self.relu(self.fc1(x))
         x = self.fc2(x)  # No softmax here as it's included in CrossEntropyLoss
         return x
+
+class ResNet18(nn.Module):
+    def __init__(self):
+        super(ResNet18, self).__init__()
+        # Load pretrained ResNet18
+        self.model = models.resnet18(pretrained=True)
+        
+        # Modify first conv layer to accept 1 channel input (MNIST is grayscale)
+        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # Modify final fully connected layer for 10 classes (MNIST)
+        num_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_features, 10)
+
+    def forward(self, x):
+        return self.model(x)
 def get_model():
-    return MNISTModel()
+    return ResNet18()
