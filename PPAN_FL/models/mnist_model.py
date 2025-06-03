@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import  resnet18, ResNet18_Weights  
+from torchvision.models import  resnet50, ResNet50_Weights  
 
 class MNISTModel(nn.Module):
     def __init__(self):
@@ -23,8 +23,7 @@ class MNISTModel(nn.Module):
 class MNISTResNet(nn.Module):
     def __init__(self, num_classes=10):
         super(MNISTResNet, self).__init__()
-        # Load pretrained ResNet18
-        self.resnet = resnet18(weights=ResNet18_Weights.DEFAULT)
+        self.resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
         # Modify first conv layer to handle single channel input
         self.resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         # Modify final fc layer for MNIST classes
