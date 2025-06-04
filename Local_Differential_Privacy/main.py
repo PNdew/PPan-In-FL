@@ -1,19 +1,13 @@
 from config import *
-from utils.data_hanlding  import *
+from preprocessing.data_handling  import *
 from fl.client import PrivacyClient
 from fl.strategy import FedAvg_Privacy
 import flwr as fl
-from fl.manager import SimpleClientManager
+from clientmanager.manager import SimpleClientManager
 from models.mnist_model import *
-from flwr.common import NDArrays, EvaluateRes, Parameters, FitRes, Metrics, Context
+from function_strategy.function_stategy import *
+from flwr.common import Context
 
-def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
-    # Multiply accuracy of each client by number of examples used
-    accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
-    examples = [num_examples for num_examples, _ in metrics]
-
-    # Aggregate and return custom metric (weighted average)
-    return {"accuracy": sum(accuracies) / sum(examples)}
 
 def client_fn(context: Context) -> fl.client.Client:
     partition_id = context.node_config["partition-id"]

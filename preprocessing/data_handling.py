@@ -1,64 +1,30 @@
-import tensorflow as tf
-import flwr as fl
-import numpy as np
+import torch
+from torchvision import transforms
+from torch.utils.data import DataLoader, TensorDataset
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import DirichletPartitioner
-import flwr as fl
-from flwr.common import Parameters, NDArrays
-from flwr.server.client_proxy import ClientProxy
-from flwr.common.typing import Config
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from torchvision import transforms
-import numpy as np
 from PIL import Image
-from config import *
+import numpy as np
+from PPAN_FL.config import NUM_CLIENTS, BATCH_SIZE
 
-
-def split_mnist_dirichlet_flwr(num_clients=NUM_CLIENTS, alpha=0.5, seed=42):
+def split_mnist_dirichlet_flwr(num_clients=100, alpha=0.5, seed=42):
     partitioner = DirichletPartitioner(
         num_partitions=num_clients, partition_by="label", alpha=alpha, seed=seed
     )
-    fds = FederatedDataset(dataset="cifar10", partitioners={"train": partitioner})
+    fds = FederatedDataset(dataset="fashion_mnist", partitioners={"train": partitioner})
     federated_data = {f"client_{i}": fds.load_partition(i) for i in range(num_clients)}
-    return fds, federated_data  # Trả về cả fds và dữ liệu phân vùng
+    return fds, federated_data
 
-def get_dataloader(client_data, batch_size=BATCH_SIZE):
-    """Create DataLoader from client data with proper image handling"""
-    try:
-        # Convert PIL images to tensors
-        transform = transforms.Compose([
-            transforms.ToTensor(),  # Converts PIL Image to tensor and scales to [0,1]
-            transforms.Normalize((0.1307,), (0.3081,))  # MNIST normalization
-        ])
-        
-        # Handle images
-        images = []
-        for img in client_data["image"]:
-            # Convert to tensor and normalize
-            img_tensor = transform(img)
-            images.append(img_tensor)
-            
-        # Stack all images into a single tensor
-        images = torch.stack(images)
-        
-        # Convert labels to tensor
-        labels = torch.tensor(client_data["label"], dtype=torch.long)
-        
-        # Create dataset and dataloader
-        dataset = TensorDataset(images, labels)
-        return DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=0
-        )
-        
-    except Exception as e:
-        print(f"Error in get_dataloader: {str(e)}")
-        raise
+def get_dataloader(client_data, batch_size=16):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+    x_tensor = torch.stack([transform(img) for img in client_data["image"]])
+    y_tensor = torch.tensor(client_data["label"], dtype=torch.long)
+    dataset = TensorDataset(x_tensor, y_tensor)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
 
 def get_dataloader_cifar10(client_data, batch_size=BATCH_SIZE):
     try:
@@ -110,4 +76,3 @@ def load_data(num_clients: int):
     except Exception as e:
         print(f"Error in load_data: {str(e)}")
         raise
-

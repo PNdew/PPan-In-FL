@@ -3,7 +3,7 @@
 import flwr as fl
 from config import *
 from models.privacy_mechanism import PrivacyMechanism
-from utils.metrics import compute_privacy_leakage, compute_distortion
+from metric.metrics import compute_privacy_leakage, compute_distortion
 import torch.optim as optim
 import torch.nn.functional as F
 import torch
@@ -15,10 +15,9 @@ from typing import Dict, Tuple
 
 # Define PrivacyClient for Federated Learning
 class PrivacyClient(fl.client.NumPyClient):
-    def __init__(self, model, train_loader, test_loader):
+    def __init__(self, model, train_loader, PRIVACY_WEIGHT):
         self.model = model.to(DEVICE)
         self.train_loader = train_loader
-        self.test_loader = test_loader
         self.param_shapes = [p.shape for p in self.model.parameters()]
         self.total_params = sum(p.numel() for p in self.model.parameters())
         self.privacy_mech = PrivacyMechanism(self.total_params, noise_scale=NOISE_SCALE).to(DEVICE)
@@ -26,6 +25,7 @@ class PrivacyClient(fl.client.NumPyClient):
             list(self.model.parameters()) + list(self.privacy_mech.parameters()),
             lr=LEARNING_RATE
         )
+        self.PRIVACY_WEIGHT = PRIVACY_WEIGHT
 
     def get_parameters(self, config=None):
         """Trả về tham số của mô hình dưới dạng danh sách NumPy arrays"""
@@ -91,43 +91,4 @@ class PrivacyClient(fl.client.NumPyClient):
             "privacy_leakage": privacy_leakage,
             "distortion": distortion
         }
-    def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]) -> Tuple[float, int, Dict[str, Scalar]]:
-        self.set_parameters(parameters)
-        self.model.eval()
-
-        total_loss, correct, total = 0.0, 0, 0
-
-        with torch.no_grad():
-            for images, labels in self.test_loader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
-                outputs = self.model(images)
-                loss = F.cross_entropy(outputs, labels)
-
-                total_loss += loss.item()
-                preds = outputs.argmax(dim=1)
-                correct += (preds == labels).sum().item()
-                total += labels.size(0)
-
-        avg_loss = total_loss / len(self.test_loader) if len(self.test_loader) > 0 else 0.0
-        accuracy = correct / total if total > 0 else 0.0
-
-        # --- Mã hóa tham số mô hình để tính privacy leakage và distortion ---
-        with torch.no_grad():
-            params = [p.detach().cpu().numpy() for p in self.model.parameters()]
-            flat_params = np.concatenate([p.flatten() for p in params])
-            flat_tensor = torch.tensor(flat_params, dtype=torch.float32).unsqueeze(0).to(DEVICE)
-            encrypted_params = self.privacy_mech.encrypt(flat_tensor)
-            encrypted_np = encrypted_params.detach().cpu().numpy()
-
-            privacy_leakage = compute_privacy_leakage(encrypted_np, flat_params)
-            distortion = compute_distortion(flat_params, encrypted_np)
-
-        metrics = {
-            "test_loss": float(avg_loss),
-            "test_accuracy": float(accuracy),
-            "test_privacy_leakage": float(privacy_leakage),
-            "test_distortion": float(distortion)
-        }
-
-        return float(avg_loss), total, metrics
-
+   

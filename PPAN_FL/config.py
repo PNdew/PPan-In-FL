@@ -6,7 +6,7 @@ NUM_CLIENTS = 100
 BATCH_SIZE = 16
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LEARNING_RATE = 0.01
-PRIVACY_WEIGHT = 0.5
+PRIVACY_WEIGHT = [500,200,100,10,1,0.1,0.01,0.001]
 NUM_ROUNDS = 300
 NOISE_SCALE = 0.01
 

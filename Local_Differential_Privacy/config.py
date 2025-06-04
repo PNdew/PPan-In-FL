@@ -6,7 +6,7 @@ import torch
 NUM_CLIENTS = 100
 K_CLIENTS = 10
 BATCH_SIZE = 16
-NUM_ROUNDS = 1000
+NUM_ROUNDS = 300
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 LEARNING_RATE = 0.01
 

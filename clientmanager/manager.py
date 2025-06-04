@@ -1,10 +1,11 @@
-import flwr as fl
-import threading
-import random
-from flwr.server.client_proxy import ClientProxy
 from flwr.server.client_manager import ClientManager
-from flwr.server.criterion import Criterion
+from flwr.server.client_proxy import ClientProxy
 from typing import Dict, List, Optional
+import random
+import threading
+from flwr.server.client_proxy import ClientProxy
+from flwr.server.criterion import Criterion
+
 
 class SimpleClientManager(ClientManager):
     def __init__(self) -> None:
@@ -50,7 +51,7 @@ class SimpleClientManager(ClientManager):
         min_num_clients: Optional[int] = None,
         criterion: Optional[Criterion] = None,
     ) -> List[ClientProxy]:
-    
+
         if min_num_clients is None:
             min_num_clients = num_clients
         self.wait_for(min_num_clients)
@@ -59,6 +60,7 @@ class SimpleClientManager(ClientManager):
         if num_clients == 1:
             sampled_cids = random.sample(available_cids, num_clients)
             return [self.clients[cid] for cid in sampled_cids]
-        
+
         sampled_cids = random.sample(available_cids, num_clients)
+        self.seed +=1
         return [self.clients[cid] for cid in sampled_cids]
