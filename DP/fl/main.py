@@ -1,23 +1,22 @@
-from config import *
-from models.mnist_model import *
-from fl.client import PrivacyClient
-from fl.strategy import *
-from clientmanager.manager import SimpleClientManager
-from preprocessing.data_handling import split_mnist_dirichlet_flwr, get_dataloader
+from client import PrivacyClient
+from Strategy import FedAvg_Privacy
 import flwr as fl
-from torchvision import datasets, transforms
-from metric.metrics import *
+from clientmanager.manager import SimpleClientManager
+from models.mnist_model import Net
+from preprocessing.data_handling import split_mnist_dirichlet_flwr, get_dataloader
 from function_strategy.function_stategy import *
+from flwr.common import Context
+import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import torchvision.datasets as datasets
+import torchvision.transforms as transforms
+from config import *
 
-
-
-
-fds, federated_data = split_mnist_dirichlet_flwr()  
+fds, federated_data = split_mnist_dirichlet_flwr()
 # Federated Learning Simulation
-def get_client_fn(privacy_weight):
+def get_client_fn(epsilon,delta, sensitivity):
     def client_fn(context: Context) -> fl.client.Client:
         partition_id = context.node_config["partition-id"]
         if f"client_{partition_id}" not in federated_data:
@@ -26,18 +25,19 @@ def get_client_fn(privacy_weight):
         train_loader = get_dataloader(client_data)
         test_loader = get_dataloader(client_data)
         model = Net()
-        return PrivacyClient(model, train_loader, test_loader, privacy_weight).to_client()
+        return PrivacyClient(model, train_loader, epsilon, delta, sensitivity).to_client()
     return client_fn
 
 
-def get_evaluate_fn(testset):
+def get_evaluate_fn(testset, epsilon):
     """Hàm evaluate trung tâm cho CIFAR-10 với ResNet50"""
     testloader = DataLoader(testset, batch_size=64, shuffle=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def evaluate(server_round: int, parameters: fl.common.NDArrays, config: dict):
         
-        model = Net.to(device)
+        model = Net()
+        model.to(device)
         model.eval()
 
         # Lấy state_dict từ tham số FL
@@ -74,19 +74,17 @@ def get_evaluate_fn(testset):
 
         print(f"[Evaluation] Round {server_round}: Loss = {avg_loss:.4f}, Accuracy = {accuracy:.4f}")
 
-        # Ghi kết quả vào file
-        with open(f"accuracy_get_evaluate_fn{PRIVACY_WEIGHT}.txt", "a") as f:
+        with open(os.path.join(RESULTS_DIR, f"accuracy_get_evaluate_fn{epsilon}.txt"), "a") as f:
             f.write(f"{accuracy:.6f}\n")
-        with open(f"loss_get_evaluate_fn{PRIVACY_WEIGHT}.txt", "a") as f:
+
+        with open(os.path.join(RESULTS_DIR, f"loss_get_evaluate_fn{epsilon}.txt"), "a") as f:
             f.write(f"{avg_loss:.6f}\n")
 
         return avg_loss, {"accuracy": accuracy}
 
     return evaluate
-def run_simulation_for_privacy_weight(p_weight):
-    global PRIVACY_WEIGHT
-    PRIVACY_WEIGHT = p_weight  # Gán lại giá trị để dùng trong client
 
+def main():
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -111,17 +109,18 @@ def run_simulation_for_privacy_weight(p_weight):
         fit_metrics_aggregation_fn=aggregate_fit_metrics,
         evaluate_metrics_aggregation_fn=aggregate_evaluate_metrics,
         evaluate_fn=get_evaluate_fn(centralized_testset),
-        PRIVACY_WEIGHT=p_weight,  # Truyền privacy_weight vào strategy
+        epsilon= eplison,
+        delta=delta,
     )
 
     # Tạo thư mục riêng cho mỗi privacy_weight
-    subdir = os.path.join(RESULTS_DIR, f"privacy_{p_weight}")
+    subdir = os.path.join(RESULTS_DIR, f"epsilon_{eplison}")
     os.makedirs(subdir, exist_ok=True)
     with open(os.path.join(subdir, "log.txt"), "w") as f:
-        f.write(f"Running simulation with privacy_weight={p_weight}\n")
+        f.write(f"Running simulation with epsilon={eplison}\n")
 
     fl.simulation.start_simulation(
-        client_fn=get_client_fn(p_weight),
+        client_fn=get_client_fn(eplison, delta, sensitivity),
          # Truyền hàm client với privacy_weight
         num_clients=NUM_CLIENTS,
         config=fl.server.ServerConfig(num_rounds=NUM_ROUNDS),
@@ -130,8 +129,4 @@ def run_simulation_for_privacy_weight(p_weight):
         client_resources={'num_cpus': 1, 'num_gpus': 0.1},
     )
 if __name__ == "__main__":
-    PRIVACY_WEIGHT_LIST = [500, 200, 100, 10, 1, 0.1, 0.01, 0.001]
-    for pw in PRIVACY_WEIGHT_LIST:
-        print(f" Đang chạy với privacy_weight = {pw}")
-        run_simulation_for_privacy_weight(pw)
-
+    main()
